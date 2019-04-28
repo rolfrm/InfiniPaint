@@ -624,7 +624,7 @@ int main(){
   ASSERT(node_get_payload(child_node2) == 10);
 
 
-      node child_node222 = get_sub_node(child_node22, 2);
+  node child_node222 = get_sub_node(child_node22, 2);
     
     u64 * child_index;
     node * nodes;
@@ -698,7 +698,6 @@ int main(){
   float scale = 1;
   int zoomLevel = 0;
   while(true){
-    printf("Scale:%i/ %f\n", zoomLevel, scale);
     gl_window_make_current(win);
     int window_width, window_height;
     gl_window_get_size(win, &window_width, &window_height);
@@ -708,9 +707,7 @@ int main(){
     int keys[] = {KEY_UP, KEY_DOWN, KEY_RIGHT, KEY_LEFT};
     for(u64 i = 0; i < array_count(keys); i++){
       states[i] = gl_window_get_key_state(win, keys[i]);
-      printf("%i %i  " , states[i], keys[i]);
     }
-    printf("\n");
 
     size_t event_cnt = gl_get_events(evt_buf, array_count(evt_buf));
     UNUSED(event_cnt);
@@ -737,7 +734,7 @@ int main(){
 	right_drag = false;
       }else if(evt.type == EVT_MOUSE_MOVE){
 	var mevt = (evt_mouse_move *) &evt;
-	printf("%i %i move\n", mevt->x, mevt->y);
+	UNUSED(mevt);
       }else if(evt.type == EVT_MOUSE_SCROLL){
 	var sevt = (evt_mouse_scroll *) &evt;
 	scale *= (1 + sevt->scroll_y * 0.1);
@@ -772,25 +769,24 @@ int main(){
     p2.x += 0.5;
     p2.y += 0.5;
     p2.y = 1 - p2.y;
-    vec2_print(p2);vec2_print(mouse_pt);printf("\n");
-    node d = first_node;
+    p2 = vec2_scale(p2, 1.0);
+    node d = nodes[node_count - 7];
     if(click){
-      while(true){
+      vec2_print(p2);vec2_print(mouse_pt);printf("\n");
+    
+      for(int i = 0; i < 6; i++){
 	var prev = d;
 	vec2 prevp = p2;
 	d = detect_collision(d, &p2);
 	vec2_print(p2);
-	printf(" %i\n", d.index);
-	if((d.index == no_node || node_get_payload(d) == 0) && click){
+	//printf(" %i\n", d.index);
+	if(d.index == no_node || node_get_payload(d) == 0){
 	  node_create_children(prev);
 	  prev = detect_collision(prev, &prevp);
-	  node_set_payload(prev, current_color);
-	  if(current_color != 1){
-	    current_color = 1;
-	  }else{
-	    current_color = 2;
+	  d = prev;
+	  if(i == 5){
+	    node_set_payload(prev, 6);
 	  }
-	  break;
 	}
       }
     }
