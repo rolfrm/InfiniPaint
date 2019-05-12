@@ -437,8 +437,8 @@ void tree_it_move(tree_it * it, int x, int y){
     memcpy(it->nodes + it->init_count, it->ctx->nodes + it->init_count, (node_count - it->init_count) * sizeof(it->nodes[0]));
 
     it->child_index = realloc(it->child_index, node_count * sizeof(it->child_index[0]));
-
-    memcpy(it->child_index + it->init_count -1, it->ctx->child_index + it->init_count - 1, (node_count - it->init_count + 1) * sizeof(it->child_index[0]));
+    if(node_count > 1)
+      memcpy(it->child_index + it->init_count -1, it->ctx->child_index + it->init_count - 1, (node_count - it->init_count + 1) * sizeof(it->child_index[0]));
     
     array_reverse(it->nodes, sizeof(it->nodes[0]), node_count);
     array_reverse(it->child_index, sizeof(it->child_index[0]), node_count);
@@ -720,6 +720,7 @@ void test_tree_context(){
   test_move( 1, 0);
   test_move( -1, 0);
   test_move( -1, 0);
+  /*
   for(int i = 0; i < 10000; i++)
     test_move( -1, 0);
   for(int i = 0; i < 20000; i++)
@@ -731,7 +732,7 @@ void test_tree_context(){
   for(int i = 0; i < 20000; i++)
     test_move( 0, 1);
   for(int i = 0; i < 10000; i++)
-    test_move( 0, -1);
+  test_move( 0, -1);*/
 }
 
 
