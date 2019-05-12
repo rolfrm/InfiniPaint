@@ -65,7 +65,6 @@ node node_create_child(node n, size_t i){
 }
 
 void node_create_children(node n){
-  printf("Create 4\n");
   for(u64 i = 0; i < 4; i++){
     node_create_child(n, i);
   }
@@ -80,6 +79,7 @@ node node_create_parent(node n){
     child_index = 0;
   n.ctx->indexes[parent.index * 4 + child_index] = n.index;
   n.ctx->last_parent_index = child_index;
+
   return parent;
 }
 
@@ -224,22 +224,24 @@ void tree_index_move2(tree_index * it, int rx, int ry){
   else if(ry == -1)
     mask = 0b10, neg=0b10;
   int counter = -1;
-  //if(!neg){
-    // go up and find the first parent that satisfies condition.
-    for(int i = 0; i < (int)it->count; i++){
+  // go up and find the first parent that satisfies condition.
+  
+  for(int i = 0; i < (int)it->count -1; i++){
       int mem_index = it->count - 1 -i;
       int cid = it->childidx[mem_index];
-      if(neg == (mask & cid)){
+      
+      bool found_parent = (bool)(neg == (mask & cid));
+      if(found_parent){
 	counter = i;
 	break;
       }
-    }
-    if(counter < 0){
-      it->hit_parent = true;
-      return;
-    }
-    
-    // does this work?
+  }
+  if(counter < 0){
+    it->hit_parent = true;
+    return;
+  }
+  
+  // does this work?
     for(int i = counter; i >= 0; i--){
       int mem_index = it->count - 1 -i;
       int cid = it->childidx[mem_index];
@@ -256,11 +258,14 @@ void tree_index_move2(tree_index * it, int rx, int ry){
 	  cid = cid & ~mask;
 	}
       }
+
       if(mem_index == 0){
 	it->hit_parent = true;
 	return;
       }
+
       node cnode = node_create_child(it->nodes[mem_index - 1], cid);
+
       it->nodes[mem_index] = cnode;
       it->childidx[mem_index] = cid;
     }
@@ -340,44 +345,126 @@ void render_node(node nd, int size, int x, int y){
   render_node(get_sub_node(nd, 2), size, x, y + size);
   render_node(get_sub_node(nd, 3), size, x + size, y + size);
 }
-/*
+
+typedef struct{
+  node * nodes; //roots to parent.
+  u64 * child_index;
+  u64 count;
+  node_context * ctx;
+}tree_context;
+
+tree_context * tree_context_new(){
+  node_context * nctx = node_context_create();
+  node_create(nctx); // discard node.
+  node first_node = node_create(nctx);
+
+  tree_context * ctx = alloc0(sizeof(tree_context));
+  
+  ctx->ctx = nctx;
+  ctx->nodes = alloc0(sizeof(ctx->nodes[0]));
+  ctx->nodes[0] = first_node;
+  ctx->child_index = alloc0(sizeof(ctx->child_index[0]));
+  ctx->child_index[0] = 0;
+
+  ctx->count = 1;
+  return ctx;
+}
+
+void tree_context_add_parent(tree_context * ctx){
+  u64 new_count = ctx->count + 1;
+  ctx->nodes = realloc(ctx->nodes, sizeof(ctx->nodes[0]) * new_count);
+  ctx->child_index = realloc(ctx->child_index, sizeof(ctx->child_index) * new_count);
+  node new_parent = node_create_parent(ctx->nodes[ctx->count - 1]);
+  ctx->nodes[ctx->count] = new_parent;
+  ctx->child_index[ctx->count - 1] = ctx->ctx->last_parent_index;
+  ctx->child_index[ctx->count] = 0;
+  ctx->count = new_count;
+}
+
 typedef struct{
   node * nodes;
   u64 * child_index;
   u64 count;
-
-}tree_context;
-
-typedef struct{
-  node * nodes;
-  u64 * child_idx;
-  u64 count;
+  u64 init_count;
   tree_context * ctx;
+  tree_index index;
 }tree_it;
+void tree_it_move(tree_it * it, int x, int y);
+tree_it * tree_it_new(tree_context * ctx){
+  tree_it * it = alloc0(sizeof(tree_it));
+  it->ctx = ctx;
+  tree_it_move(it, 0, 0);
+  
+  return it;
+}
+
+void tree_it_delete(tree_it ** iterator){
+  dealloc(*iterator);
+  *iterator = NULL; 
+}
 
 
-void test_move2(tree_it * it, int x, int y){
-      
-      tree_index_move2(&it, x, y);
-      if(it.hit_parent){
-	node parent = node_create_parent(nodes[0]);
-	it.capacity += 1;
-	node_count += 1;
-	nodes = realloc(nodes, sizeof(nodes[0]) * node_count);
-	child_index = realloc(child_index, sizeof(child_index[0]) * node_count);
-	nodes[0] = parent;
-	child_index[0] = 0;
-	memmove(nodes + 1, nodes, (node_count - 1) * sizeof(nodes[0]));
-	memmove(child_index + 1, child_index, (node_count - 1) * sizeof(child_index[0]));
-	child_index[1] = ctx->last_parent_index;
-	bool do_create = it.create;
-	it = tree_index_from_data(nodes, child_index, node_count);
-	it.create = do_create;
-	test_move2(x, y);
-	return;
-      }
-    }
-*/
+void * realloc_copy_rest(void * array, void * src, size_t s1, size_t s){
+  array = realloc(array, s);
+  memcpy(array + s1, src + s1, s - s1);
+  return array;
+}
+
+void array_reverse(void * array, size_t elem_size, size_t count){
+  if(array == NULL || count == 0) return;
+  char buffer[elem_size];
+  for(size_t i = 0; i < count / 2; i++){
+    size_t i2 = count - i - 1;
+    void * buf = buffer;
+    void * loc1 = array + elem_size * i;
+    void * loc2 = array + elem_size * i2;
+    memcpy(buf, loc1, elem_size);
+    memcpy(loc1, loc2 , elem_size);
+    memcpy(loc2, buf, elem_size);
+  }
+}
+
+void tree_it_move(tree_it * it, int x, int y){
+  
+ start:;
+
+  u64 node_count = it->ctx->count;
+  if(it->nodes == NULL || it->count != node_count){
+  
+    array_reverse(it->nodes, sizeof(it->nodes[0]), it->init_count);
+    array_reverse(it->child_index, sizeof(it->child_index[0]), it->init_count);
+    it->nodes = realloc(it->nodes, node_count * sizeof(it->nodes[0]));
+    memcpy(it->nodes + it->init_count, it->ctx->nodes + it->init_count, (node_count - it->init_count) * sizeof(it->nodes[0]));
+
+    it->child_index = realloc(it->child_index, node_count * sizeof(it->child_index[0]));
+
+    memcpy(it->child_index + it->init_count -1, it->ctx->child_index + it->init_count - 1, (node_count - it->init_count + 1) * sizeof(it->child_index[0]));
+    
+    array_reverse(it->nodes, sizeof(it->nodes[0]), node_count);
+    array_reverse(it->child_index, sizeof(it->child_index[0]), node_count);
+    
+    it->count = node_count;
+    it->init_count = node_count;
+    it->index = tree_index_from_data(it->nodes, it->child_index, node_count);
+  }
+  if(x == 0 && y == 0) return;
+
+  tree_index_move2(&it->index, x, y);
+
+  
+  if(it->index.hit_parent){
+    it->index.hit_parent = false;
+    tree_context_add_parent(it->ctx);
+    goto start;
+  }
+}
+
+node tree_it_node(tree_it * it){
+  if(it->nodes == NULL){
+    tree_it_move(it, 0, 0);
+  }
+  return tree_index_node(&it->index);
+}
 
 /*
 void render_tree(node * nodes, int node_count, int x, int y, int size, int width, int height){
@@ -595,17 +682,72 @@ void test_quadtree(){
   
 }
 
+void test_tree_context(){
+
+  for(int i = 1; i < 10; i++){
+    i32 array[i];
+    i32 array2[i];
+    for(int j = 0; j < i; j++){
+      array[j] = j;
+      array2[i - j - 1] = j;
+    }
+    array_reverse(array, sizeof(array[0]), array_count(array));
+    for(size_t i = 0; i < array_count(array); i++){
+      ASSERT(array[i] == array2[i]);
+    }
+  }
+
+  tree_context * tctx = tree_context_new();
+  tree_it * it_ctx = tree_it_new(tctx);
+  void test_move(int x, int y){
+    /*printf("Move: \n");
+    for(u64 i = 0; i < it_ctx->count; i++){
+      printf("%i %i\n", it_ctx->nodes[i].index, it_ctx->child_index[i]);
+    }
+    printf("\n");
+    */
+    tree_it_move(it_ctx, x, y);
+    node n = tree_it_node(it_ctx);
+    printf("node> %i\n", n.index);
+  }
+  UNUSED(it_ctx);
+  test_move( 0, 0);
+  test_move( 1, 0);
+  test_move( -1, 0);
+  test_move( 1, 0);
+  test_move( -1, 0);
+  test_move( 1, 0);
+  test_move( 1, 0);
+  test_move( -1, 0);
+  test_move( -1, 0);
+  for(int i = 0; i < 10000; i++)
+    test_move( -1, 0);
+  for(int i = 0; i < 20000; i++)
+    test_move( 1, 0);
+  for(int i = 0; i < 10000; i++)
+    test_move( -1, 0);
+  for(int i = 0; i < 10000; i++)
+    test_move( 0, -1);
+  for(int i = 0; i < 20000; i++)
+    test_move( 0, 1);
+  for(int i = 0; i < 10000; i++)
+    test_move( 0, -1);
+}
 
 
 int main(){
 
   test_quadtree();
-  //return 0;
+  test_tree_context();
+  return 0;
   colors[5].raw = 0xFFFFFFFF;
   colors[10].raw = 0xDDDDDDDD;
   colors[6].raw = 0xBBBBBBBB;
   colors[2].raw = 0xFF0000FF;
   colors[1].raw = 0xFFFF00FF;
+
+  
+  
   node_context * ctx = node_context_create();
   node first_node = node_create(ctx);
   node_create_children(first_node);
