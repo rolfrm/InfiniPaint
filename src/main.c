@@ -26,7 +26,6 @@ node node_create(node_context * ctx){
   
   u64 index = ctx->node_count;
   ctx->node_count += 1;
-  //printf("create node. %i\n", ctx->node_count);
   ctx->indexes = realloc(ctx->indexes, sizeof(u64) * 4 * ctx->node_count);
   for(u64 i = 0; i < 4; i++){
     ctx->indexes[i + index * 4] = no_node;
@@ -115,21 +114,29 @@ colorf color_to_colorf(color col){
   }
   return c;
 }
-
+// -0.5
+// -1.0
 color colors[20];
 u64 current_color = 1;
 node detect_collision(node n, vec2 * loc){
   vec2 l = *loc;
   int child = 0;
-  if(l.x > 0.5){
+
+  if(l.x > 0.0){
     l.x -= 0.5;
     child = 1;
+  }else{
+    l.x += 0.5;
+    child = 0;
   }
-  if(l.y > 0.5){
+  if(l.y > 0.0){
     l.y -= 0.5;
     child += 2;
+  }else{
+    l.y += 0.5;
   }
-  *loc = vec2_scale(l, 2.0);
+  l = vec2_scale(l, 2.0);
+  *loc = l;
   return get_sub_node(n, child);
 }
 typedef struct{
@@ -227,7 +234,7 @@ void tree_index_move2(tree_index * it, int rx, int ry){
 	break;
       }
     }
-    if(counter == -1){
+    if(counter < 0){
       it->hit_parent = true;
       return;
     }
@@ -334,6 +341,45 @@ void render_node(node nd, int size, int x, int y){
   render_node(get_sub_node(nd, 3), size, x + size, y + size);
 }
 /*
+typedef struct{
+  node * nodes;
+  u64 * child_index;
+  u64 count;
+
+}tree_context;
+
+typedef struct{
+  node * nodes;
+  u64 * child_idx;
+  u64 count;
+  tree_context * ctx;
+}tree_it;
+
+
+void test_move2(tree_it * it, int x, int y){
+      
+      tree_index_move2(&it, x, y);
+      if(it.hit_parent){
+	node parent = node_create_parent(nodes[0]);
+	it.capacity += 1;
+	node_count += 1;
+	nodes = realloc(nodes, sizeof(nodes[0]) * node_count);
+	child_index = realloc(child_index, sizeof(child_index[0]) * node_count);
+	nodes[0] = parent;
+	child_index[0] = 0;
+	memmove(nodes + 1, nodes, (node_count - 1) * sizeof(nodes[0]));
+	memmove(child_index + 1, child_index, (node_count - 1) * sizeof(child_index[0]));
+	child_index[1] = ctx->last_parent_index;
+	bool do_create = it.create;
+	it = tree_index_from_data(nodes, child_index, node_count);
+	it.create = do_create;
+	test_move2(x, y);
+	return;
+      }
+    }
+*/
+
+/*
 void render_tree(node * nodes, int node_count, int x, int y, int size, int width, int height){
   // x and y are offsets for the rendering
   // size is the size of the node level rendering.
@@ -433,56 +479,24 @@ void test_quadtree(){
     it.create = true;
     printf("---\n");
     
-    node * nodes_buffer = NULL;
-    u64 * child_index_buffer = NULL;
+
     void test_move(int x, int y){
-      nodes_buffer = realloc(nodes_buffer, node_count * sizeof(nodes_buffer[0]));
-      memcpy(nodes_buffer, nodes, sizeof(nodes[0]) * node_count);
-      child_index_buffer = realloc(child_index_buffer, node_count * sizeof(child_index_buffer[0]));
-      memcpy(child_index_buffer, child_index, sizeof(child_index[0]) * node_count);
-      
-      tree_index_move(&it, x, y);
+      tree_index_move2(&it, x, y);
       if(it.hit_parent){
-	node parent = node_create_parent(nodes_buffer[0]);
+	node parent = node_create_parent(nodes[0]);
 	it.capacity += 1;
 	node_count += 1;
 	nodes = realloc(nodes, sizeof(nodes[0]) * node_count);
 	child_index = realloc(child_index, sizeof(child_index[0]) * node_count);
 	nodes[0] = parent;
 	child_index[0] = 0;
-	memmove(nodes + 1, nodes_buffer, (node_count - 1) * sizeof(nodes[0]));
-	memmove(child_index + 1, child_index_buffer, (node_count - 1) * sizeof(child_index[0]));
+	memmove(nodes + 1, nodes, (node_count - 1) * sizeof(nodes[0]));
+	memmove(child_index + 1, child_index, (node_count - 1) * sizeof(child_index[0]));
 	child_index[1] = ctx->last_parent_index;
 	bool do_create = it.create;
 	it = tree_index_from_data(nodes, child_index, node_count);
 	it.create = do_create;
 	test_move(x, y);
-	return;
-      }
-    }
-
-    void test_move2(int x, int y){
-      nodes_buffer = realloc(nodes_buffer, node_count * sizeof(nodes_buffer[0]));
-      memcpy(nodes_buffer, nodes, sizeof(nodes[0]) * node_count);
-      child_index_buffer = realloc(child_index_buffer, node_count * sizeof(child_index_buffer[0]));
-      memcpy(child_index_buffer, child_index, sizeof(child_index[0]) * node_count);
-      
-      tree_index_move2(&it, x, y);
-      if(it.hit_parent){
-	node parent = node_create_parent(nodes_buffer[0]);
-	it.capacity += 1;
-	node_count += 1;
-	nodes = realloc(nodes, sizeof(nodes[0]) * node_count);
-	child_index = realloc(child_index, sizeof(child_index[0]) * node_count);
-	nodes[0] = parent;
-	child_index[0] = 0;
-	memmove(nodes + 1, nodes_buffer, (node_count - 1) * sizeof(nodes[0]));
-	memmove(child_index + 1, child_index_buffer, (node_count - 1) * sizeof(child_index[0]));
-	child_index[1] = ctx->last_parent_index;
-	bool do_create = it.create;
-	it = tree_index_from_data(nodes, child_index, node_count);
-	it.create = do_create;
-	test_move2(x, y);
 	return;
       }
     }
@@ -511,23 +525,23 @@ void test_quadtree(){
     for(int j = 0; j < 2; j++){
       printf("\n");
       for(int i = 0; i < 7; i++){
-	test_move2(1, 0);
+	test_move(1, 0);
 	var node = tree_index_node(&it);
 	printf("Got node: %i\n", node.index);
       }
       for(int i = 0; i < 7; i++){
-	test_move2(-1, 0);
+	test_move(-1, 0);
 	var node = tree_index_node(&it);
 	printf("Got node4: %i\n", node.index);
       }
     }
 
     printf("---------\n");
-    test_move2(0,1);
-    test_move2(0,-1);
+    test_move(0,1);
+    test_move(0,-1);
  
     for(int i = 0; i < 7; i++){
-      test_move2(0, -1);
+      test_move(0, -1);
       var node = tree_index_node(&it);
       printf("Got node2: %i\n", node.index);
     }
@@ -535,18 +549,18 @@ void test_quadtree(){
     for(int j = 0; j < 2; j++){
       printf("\n");
       for(int i = 0; i < 7; i++){
-	test_move2(0, 1);
+	test_move(0, 1);
 	var node = tree_index_node(&it);
 	printf("Got node: %i\n", node.index);
       }
       for(int i = 0; i < 7; i++){
-	test_move2(0, -1);
+	test_move(0, -1);
 	var node = tree_index_node(&it);
 	printf("Got node4: %i\n", node.index);
       }
     }
     for(int i = 0; i < 70; i++){
-	test_move2(0, 1);
+	test_move(0, 1);
 	var node = tree_index_node(&it);
 	printf("Got node5: %i\n", node.index);
       }
@@ -647,32 +661,25 @@ int main(){
     it.create = true;
     printf("---\n");
 
-
     
-    node * nodes_buffer = NULL;
-    u64 * child_index_buffer = NULL;
-    void test_move2(int x, int y, u64 paint){
+    void test_move(int x, int y, u64 paint){
       
-      nodes_buffer = realloc(nodes_buffer, node_count * sizeof(nodes_buffer[0]));
-      memcpy(nodes_buffer, nodes, sizeof(nodes[0]) * node_count);
-      child_index_buffer = realloc(child_index_buffer, node_count * sizeof(child_index_buffer[0]));
-      memcpy(child_index_buffer, child_index, sizeof(child_index[0]) * node_count);
       tree_index_move2(&it, x, y);
       if(it.hit_parent){
-	node parent = node_create_parent(nodes_buffer[0]);
+	node parent = node_create_parent(nodes[0]);
 	it.capacity += 1;
 	node_count += 1;
 	nodes = realloc(nodes, sizeof(nodes[0]) * node_count);
 	child_index = realloc(child_index, sizeof(child_index[0]) * node_count);
 	nodes[0] = parent;
 	child_index[0] = 0;
-	memmove(nodes + 1, nodes_buffer, (node_count - 1) * sizeof(nodes[0]));
-	memmove(child_index + 1, child_index_buffer, (node_count - 1) * sizeof(child_index[0]));
+	memmove(nodes + 1, nodes, (node_count - 1) * sizeof(nodes[0]));
+	memmove(child_index + 1, child_index, (node_count - 1) * sizeof(child_index[0]));
 	child_index[1] = ctx->last_parent_index;
 	bool do_create = it.create;
 	it = tree_index_from_data(nodes, child_index, node_count);
 	it.create = do_create;
-	test_move2(x, y, paint);
+	test_move(x, y, paint);
 	
 	return;
       }
@@ -683,10 +690,10 @@ int main(){
     }
 
     for(int i = 0; i < 32; i++){
-      test_move2(1,0, 0);
+      test_move(1,0, 0);
     }
     for(int i = 0; i < 32; i++){
-      test_move2(-1,0, 0);
+      test_move(-1,0, 0);
     }
 
   
@@ -697,7 +704,11 @@ int main(){
   UNUSED(start_point);
   float scale = 1;
   int zoomLevel = 0;
-  while(true){
+  vec2 offset = vec2_new(0.5,0);
+  bool should_close = false;
+  while(should_close == false){
+    //offset.x += 0.01;
+
     gl_window_make_current(win);
     int window_width, window_height;
     gl_window_get_size(win, &window_width, &window_height);
@@ -721,6 +732,9 @@ int main(){
     bool click = false;
     for(size_t i = 0; i < event_cnt; i++){
       var evt = evt_buf[i];
+      if(evt.type ==EVT_WINDOW_CLOSE){
+	should_close = true;
+      }
       if(evt.type == EVT_MOUSE_BTN_DOWN){
 	
 	var btevt = (evt_mouse_btn *)&evt;
@@ -753,32 +767,29 @@ int main(){
     blit_begin(BLIT_MODE_UNIT);
 
     blit_rectangle(-1,-1,2,2,0,0,0,1);
-    /*var offset = vec2_new(0,0);
     if(right_drag)
-      offset = vec2_sub(mouse_pt, start_point);
+      offset = vec2_add(offset, vec2_sub(mouse_pt, start_point));
+    while(offset.x > 1){
+      offset.x = 0;
+    }
+    
+    /*var offset = vec2_new(0,0);
+
     */
       //blit_translate( offset.x,  -offset.y);
     
     blit_scale(scale, scale);
     blit_translate( -0.5, -0.5);
-    
-    var tform = blit_get_view_transform();
-    tform = mat3_invert(tform);
 
-    vec2 p2 = mat3_mul_vec2(tform, mouse_pt);
-    p2.x += 0.5;
-    p2.y += 0.5;
-    p2.y = 1 - p2.y;
-    p2 = vec2_scale(p2, 1.0);
-    node d = nodes[node_count - 7];
-    if(click){
-      vec2_print(p2);vec2_print(mouse_pt);printf("\n");
+    void paintat(vec2 p, node d){
+      printf("\n\n");
+      vec2_print(p);vec2_print(mouse_pt);printf("\n");
     
       for(int i = 0; i < 6; i++){
 	var prev = d;
-	vec2 prevp = p2;
-	d = detect_collision(d, &p2);
-	vec2_print(p2);
+	vec2 prevp = p;
+	d = detect_collision(d, &p);
+	vec2_print(p);
 	//printf(" %i\n", d.index);
 	if(d.index == no_node || node_get_payload(d) == 0){
 	  node_create_children(prev);
@@ -790,31 +801,71 @@ int main(){
 	}
       }
     }
+    
+    var tform = blit_get_view_transform();
+    tform = mat3_invert(tform);
+    
+    vec2 p2 = mat3_mul_vec2(tform, mouse_pt);
+    p2.y = 0 - p2.y;
+    node d = nodes[node_count - 7];
+    click = gl_window_get_btn_state(win, 0) != 0;
+    
+    if(click){
+      paintat(p2, d);
+    }
 
-    blit_begin(BLIT_MODE_UNIT);
-    blit_scale(2.0 / 512.0, 2.0 / 512.0);
-    blit_translate(-256, -256);
+    for(int i = 0; i < 4; i++){
 
+      node * nodes_buffer2 = iron_clone(nodes, node_count * sizeof(nodes[0]));
+      u64 * child_index_buffer2 = iron_clone(child_index, node_count * sizeof(child_index[0]));
+      tree_index it2 = tree_index_from_data(nodes_buffer2, child_index_buffer2, node_count - 6);
+
+      
+      //render_node(nodes_buffer2[node_count - 7], 512,0,0);
+      float ox = 0, oy = 0;
+      if((i & 0x1) != 0)
+	ox = 1.0;
+      if((i & 0x2) != 0)
+	oy = 1.0;
+      if(i == 1)
+	tree_index_move2(&it2, 1, 0);
+      if(i == 2)
+	tree_index_move2(&it2, 0, 1);
+      if(i == 3){
+	tree_index_move2(&it2, 1, 0);
+	if(it2.hit_parent == true){
+	  it2.hit_parent = false;
+	  tree_index_move2(&it2, 0, 1);
+	  tree_index_move2(&it2, 1, 0);
+	}else{
+	  tree_index_move2(&it2, 0, 1);
+	}
+      }
+      //tree_index_move2(&it2, 1, 0);
+      if(it2.hit_parent == false){
+	blit_begin(BLIT_MODE_UNIT);
+	blit_translate(-offset.x, -offset.y);
+	blit_scale(2.0 / 512.0, 2.0 / 512.0);
+	blit_translate(-256 + ox * 512, -256 + oy * 512);      
+	render_node(tree_index_node(&it2), 512,0,0);
+      }
+      dealloc(nodes_buffer2);
+      dealloc(child_index_buffer2);
+
+    }
+    
     int y_move = states[0] - states[1];
     int x_move = states[2] - states[3];
     
-    //UNUSED(nodes);
-    render_node(nodes[node_count -7], 512,0,0);
     if(x_move != 0){
-      test_move2(x_move,0, 6);
+      test_move(x_move,0, 6);
     }
     if(y_move != 0){
-      test_move2(0, y_move, 6);
+      test_move(0, y_move, 6);
     }
-    /*node nodes[2] = {first_node, child_node}; 
-    node nodes2[10];
-    int xs[10];
-    int ys[10];
-    get_neighbooring_nodes(nodes, nodes2,xs,ys);
-    */
-    gl_window_swap(win);
     
-
+    gl_window_swap(win);
   }
+  
   return 0;
 }
